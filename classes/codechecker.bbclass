@@ -4,6 +4,8 @@ CODECHECKER_EXCLUDED_PACKAGES ??= "libgcc-initial glibc gcc-runtime smack"
 CODECHECKER_REPORT_ENDPOINT ??= "Default"
 CODECHECKER_ANALYZE_EXTRA_ARGS ??= ""
 
+CODECHECKER_USE_CMAKE_COMPILE_COMMANDS ??= "0"
+
 python () {
     if d.getVar("CODECHECKER_ENABLED") == "1":
         if not bb.data.inherits_class('nativesdk', d) \
@@ -12,11 +14,22 @@ python () {
             and not bb.data.inherits_class('crosssdk', d) \
             and not bb.data.inherits_class('allarch', d) \
             and not d.getVar('PN', True) in d.getVar('CODECHECKER_EXCLUDED_PACKAGES', True):
-            d.prependVarFlag("do_compile", 'prefuncs', "do_csprecompile ")
-            d.appendVarFlag("do_compile", 'postfuncs', " do_cspostcompile")
-            bb.build.addtask("codecheckeranalyse", "do_build", "do_compile", d)
+
+            codechecker_deps = ' codechecker-native:do_populate_sysroot python3-six-native:do_populate_sysroot python3-thrift-native:do_populate_sysroot python3-codechecker-api-native:do_populate_sysroot python3-codechecker-api-shared-native:do_populate_sysroot clang-native:do_populate_sysroot python3-native:do_populate_sysroot python3-psutil-native:do_populate_sysroot python3-portalocker-native:do_populate_sysroot python3-pyyaml-native:do_populate_sysroot'
+            codecheckeranalyse_after = None
+            if d.getVar('CODECHECKER_USE_CMAKE_COMPILE_COMMANDS', True) == "1":
+                d.appendVar("EXTRA_OECMAKE", " -DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
+                codecheckeranalyse_after = "do_configure"
+            else:
+                d.prependVarFlag("do_compile", "prefuncs", "do_csprecompile ")
+                d.appendVarFlag("do_compile", "postfuncs", " do_cspostcompile")
+                d.appendVarFlag("do_compile", "depends", codechecker_deps)
+                codecheckeranalyse_after = "do_compile"
+
+            bb.build.addtask("codecheckeranalyse", "do_build", codecheckeranalyse_after, d)
+            d.appendVarFlag("do_codecheckeranalyse", "depends", codechecker_deps)
             bb.build.addtask("codecheckerreport", "do_build", "do_codecheckeranalyse", d)
-            d.appendVarFlag("do_compile", 'depends', ' codechecker-native:do_populate_sysroot python3-six-native:do_populate_sysroot python3-thrift-native:do_populate_sysroot python3-codechecker-api-native:do_populate_sysroot python3-codechecker-api-shared-native:do_populate_sysroot clang-native:do_populate_sysroot python3-native:do_populate_sysroot python3-psutil-native:do_populate_sysroot python3-portalocker-native:do_populate_sysroot python3-pyyaml-native:do_populate_sysroot')
+            d.appendVarFlag("do_codecheckerreport", "depends", codechecker_deps)
 }
 
 SAVEDENV = ""
@@ -139,4 +152,4 @@ if test x"${CODECHECKER_ENABLED}" = x"1"; then
 fi
 }
 
-addtask codecheckerreport
+addtask codecheckerreport after do_codecheckeranalyse
