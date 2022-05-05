@@ -1,0 +1,7 @@
+header:
+  version: 10
+
+  includes:
+    - kas-codechecker.yml
+
+machine: qemuarm64

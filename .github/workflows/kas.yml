@@ -1,0 +1,35 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        yocto-version: [kirkstone]
+        machine: [qemu]
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update && sudo apt-get install -y gawk wget git diffstat unzip texinfo gcc build-essential \
+        chrpath socat cpio python3 python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git \
+        python3-jinja2 libegl1-mesa libsdl1.2-dev pylint3 xterm python3-subunit mesa-common-dev zstd liblz4-tool
+    - uses: actions/checkout@v2
+
+    - name: Install Kas
+      run: |
+        sudo pip3 install kas
+
+    # We can cache up to 5GiB
+    # So we cache only sstate-cache and not the download directory
+    - name: Cache sstate for ${{ matrix.yocto-version }}-${{ matrix.machine }}
+      uses: actions/cache@v2
+      with:
+        path: |
+          build/sstate-cache
+        key: ${{ matrix.yocto-version }}-${{ matrix.machine }}
+
+    - name: Run kas on ${{ matrix.machine }} on ${{ matrix.yocto-version }}
+      run: kas build kas-${{ matrix.machine }}.yml:kas-${{ matrix.yocto-version }}.yml
